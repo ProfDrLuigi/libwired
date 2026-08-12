@@ -54,6 +54,7 @@ int wi_p7_socket_dummy = 0;
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #include <zlib.h>
 
@@ -162,6 +163,18 @@ int wi_p7_socket_dummy = 0;
         _WI_P7_ENCRYPTION_RSA_BF128_SHA512 :                \
      (options) & WI_P7_ENCRYPTION_RSA_3DES192_SHA512 ?      \
         _WI_P7_ENCRYPTION_RSA_3DES192_SHA512 : -1)
+
+
+static wi_boolean_t _wi_p7_socket_encryption_cipher_is_deprecated(wi_uinteger_t options) {
+	int	cipher;
+
+	cipher = _WI_P7_ENCRYPTION_OPTIONS_TO_ENUM(options);
+
+	return (cipher != _WI_P7_ENCRYPTION_RSA_AES192_SHA256 &&
+			cipher != _WI_P7_ENCRYPTION_RSA_AES256_SHA256 &&
+			cipher != _WI_P7_ENCRYPTION_RSA_AES192_SHA512 &&
+			cipher != _WI_P7_ENCRYPTION_RSA_AES256_SHA512);
+}
 
 #define _WI_P7_CHECKSUM_OPTIONS_TO_ENUM(options)            \
     ((options) & WI_P7_CHECKSUM_SHA1 ?                      \
@@ -654,7 +667,7 @@ static wi_boolean_t _wi_p7_socket_connect_handshake(wi_p7_socket_t *p7_socket, w
 			p7_socket->options |= _WI_P7_CHECKSUM_ENUM_TO_OPTIONS(flag);
 	}
     
-    if(WI_P7_DEPRECATED_ENCRYPTION_CIPHER(p7_socket->options)) {
+    if(_wi_p7_socket_encryption_cipher_is_deprecated(p7_socket->options)) {
         wi_log_warn(WI_STR("Connected using deprecated cipher: %d"), _WI_P7_ENCRYPTION_OPTIONS_TO_ENUM(p7_socket->options));
     }
 	
@@ -774,7 +787,7 @@ static wi_boolean_t _wi_p7_socket_accept_handshake(wi_p7_socket_t *p7_socket, wi
     if(!wi_p7_message_set_string_for_name(p7_message, wi_p7_spec_version(p7_socket->spec), WI_STR("p7.handshake.protocol.version")))
         return false;
     
-    if(WI_P7_DEPRECATED_ENCRYPTION_CIPHER(p7_socket->options)) {
+    if(_wi_p7_socket_encryption_cipher_is_deprecated(p7_socket->options)) {
         wi_log_warn(WI_STR("Connected using deprecated encryption cipher: %d"), _WI_P7_ENCRYPTION_OPTIONS_TO_ENUM(p7_socket->options));
     }
         
