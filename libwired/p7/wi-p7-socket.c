@@ -171,14 +171,6 @@ int wi_p7_socket_dummy = 0;
      (options) & WI_P7_CHECKSUM_SHA512 ?                    \
         _WI_P7_CHECKSUM_SHA512 : -1)
 
-#define _WI_P7_CHECKSUM_OPTIONS_TO_LENGTH(options)          \
-    ((options) & _WI_P7_CHECKSUM_SHA1 ?                     \
-        WI_SHA1_DIGEST_LENGTH :                             \
-     (options) & _WI_P7_CHECKSUM_SHA256 ?                   \
-        WI_SHA256_DIGEST_LENGTH :                           \
-     (options) & _WI_P7_CHECKSUM_SHA512 ?                   \
-        WI_SHA512_DIGEST_LENGTH : WI_SHA1_DIGEST_LENGTH)
-
 #define _WI_P7_ENCRYPTION_OPTIONS_TO_CHECKSUM(options)      \
     ((options) & WI_P7_ENCRYPTION_RSA_AES128_SHA1 ?         \
         _WI_P7_CHECKSUM_SHA1 :                              \
@@ -661,6 +653,10 @@ static wi_boolean_t _wi_p7_socket_connect_handshake(wi_p7_socket_t *p7_socket, w
 		if(wi_p7_message_get_enum_for_name(p7_message, &flag, WI_STR("p7.handshake.checksum")))
 			p7_socket->options |= _WI_P7_CHECKSUM_ENUM_TO_OPTIONS(flag);
 	}
+    
+    if(WI_P7_DEPRECATED_ENCRYPTION_CIPHER(p7_socket->options)) {
+        wi_log_warn(WI_STR("Connected using deprecated cipher: %d"), _WI_P7_ENCRYPTION_OPTIONS_TO_ENUM(p7_socket->options));
+    }
 	
 	if(!wi_p7_message_get_bool_for_name(p7_message, &p7_socket->remote_compatibility_check, WI_STR("p7.handshake.compatibility_check")))
 		p7_socket->remote_compatibility_check = false;
@@ -778,6 +774,10 @@ static wi_boolean_t _wi_p7_socket_accept_handshake(wi_p7_socket_t *p7_socket, wi
     if(!wi_p7_message_set_string_for_name(p7_message, wi_p7_spec_version(p7_socket->spec), WI_STR("p7.handshake.protocol.version")))
         return false;
     
+    if(WI_P7_DEPRECATED_ENCRYPTION_CIPHER(p7_socket->options)) {
+        wi_log_warn(WI_STR("Connected using deprecated encryption cipher: %d"), _WI_P7_ENCRYPTION_OPTIONS_TO_ENUM(p7_socket->options));
+    }
+        
     if(p7_socket->serialization == WI_P7_BINARY) {
         if(WI_P7_COMPRESSION_ENABLED(p7_socket->options)) {
             if(!wi_p7_message_set_enum_for_name(p7_message,
@@ -1305,7 +1305,7 @@ static wi_boolean_t _wi_p7_socket_receive_compatibility_check(wi_p7_socket_t *p7
 static wi_boolean_t _wi_p7_socket_write_binary_message(wi_p7_socket_t *p7_socket, wi_time_interval_t timeout, wi_p7_message_t *p7_message) {
 	const void			*send_buffer;
 	char				length_buffer[_WI_P7_SOCKET_LENGTH_SIZE];
-	unsigned char		checksum_buffer[_WI_P7_CHECKSUM_OPTIONS_TO_LENGTH(p7_socket->options)];
+	unsigned char		checksum_buffer[WI_SHA512_DIGEST_LENGTH];
 	wi_integer_t		compressed_size;
 #ifdef WI_RSA
 	wi_integer_t		encrypted_size;
@@ -1389,8 +1389,8 @@ static wi_boolean_t _wi_p7_socket_write_xml_message(wi_p7_socket_t *p7_socket, w
 
 static wi_p7_message_t * _wi_p7_socket_read_binary_message(wi_p7_socket_t *p7_socket, wi_time_interval_t timeout, uint32_t message_size) {
 	wi_p7_message_t		*p7_message;
-	unsigned char		local_checksum_buffer[_WI_P7_CHECKSUM_OPTIONS_TO_LENGTH(p7_socket->options)];
-	unsigned char		remote_checksum_buffer[_WI_P7_CHECKSUM_OPTIONS_TO_LENGTH(p7_socket->options)];
+	unsigned char		local_checksum_buffer[WI_SHA512_DIGEST_LENGTH];
+	unsigned char		remote_checksum_buffer[WI_SHA512_DIGEST_LENGTH];
 	wi_integer_t		decompressed_size;
 #ifdef WI_RSA
 	wi_integer_t		decrypted_size;
@@ -1845,7 +1845,7 @@ wi_p7_message_t * wi_p7_socket_read_message(wi_p7_socket_t *p7_socket, wi_time_i
 wi_boolean_t wi_p7_socket_write_oobdata(wi_p7_socket_t *p7_socket, wi_time_interval_t timeout, const void *buffer, uint32_t size) {
 	const void			*send_buffer;
 	char				length_buffer[_WI_P7_SOCKET_LENGTH_SIZE];
-	unsigned char		checksum_buffer[_WI_P7_CHECKSUM_OPTIONS_TO_LENGTH(p7_socket->options)];
+	unsigned char		checksum_buffer[WI_SHA512_DIGEST_LENGTH];
 	wi_integer_t		compressed_size;
 #ifdef WI_RSA
 	wi_integer_t		encrypted_size;
@@ -1915,8 +1915,8 @@ wi_boolean_t wi_p7_socket_write_oobdata(wi_p7_socket_t *p7_socket, wi_time_inter
 wi_integer_t wi_p7_socket_read_oobdata(wi_p7_socket_t *p7_socket, wi_time_interval_t timeout, void **out_buffer) {
 	void				*receive_buffer;
 	char				length_buffer[_WI_P7_SOCKET_LENGTH_SIZE];
-	unsigned char		local_checksum_buffer[_WI_P7_CHECKSUM_OPTIONS_TO_LENGTH(p7_socket->options)];
-	unsigned char		remote_checksum_buffer[_WI_P7_CHECKSUM_OPTIONS_TO_LENGTH(p7_socket->options)];
+	unsigned char		local_checksum_buffer[WI_SHA512_DIGEST_LENGTH];
+	unsigned char		remote_checksum_buffer[WI_SHA512_DIGEST_LENGTH];
 	wi_integer_t		result, decompressed_size;
 #ifdef WI_RSA
 	wi_integer_t		decrypted_size;
